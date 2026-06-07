@@ -1,0 +1,357 @@
+{
+  "name": "main",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4894e1b7-0464-48a3-8c53-ee86e7ab018c",
+      "name": "Manual Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const tickets = [\n  { name: \"Anna\", surname: \"Nowak\", email: \"anna.nowak@example.com\", message: \"Dzień dobry, chciałabym zapytać o możliwość współpracy i zakup Państwa usług enterprise. Proszę o kontakt w sprawie oferty.\" },\n  { name: \"Tomasz\", surname: \"Kowalczyk\", email: \"t.kowalczyk@example.com\", message: \"System nie działa od rana, tracę klientów, proszę o natychmiastową pomoc!!! To nie do pomyślenia.\" },\n  { name: \"Kasia\", surname: \"Wiśniewska\", email: \"kasia.w@example.com\", message: \"Chciałabym aplikować na stanowisko junior developer, czy rekrutacja jest nadal otwarta? Załączam CV w następnej wiadomości.\" },\n  { name: \"Marek\", surname: \"Lewandowski\", email: \"marek.l@example.com\", message: \"Dziękuję za szybką realizację zamówienia, wszystko działa bez zarzutu. Polecam Waszą firmę.\" },\n  { name: \"Joanna\", surname: \"Zielińska\", email: \"j.zielinska@example.com\", message: \"Nie mogę zalogować się do panelu od dwóch godzin, reset hasła też nie działa. Potrzebuję dostępu pilnie bo mam deadline.\" },\n  { name: \"Piotr\", surname: \"Dąbrowski\", email: \"p.dabrowski@example.com\", message: \"Interesuje mnie oferta na pakiet premium dla zespołu 20 osób. Proszę o wycenę i możliwe terminy wdrożenia.\" },\n  { name: \"Aleksandra\", surname: \"Wójcik\", email: \"a.wojcik@example.com\", message: \"Czy prowadzicie rekrutację na stanowisko senior Golang developer? Mam 8 lat doświadczenia w fintech.\" },\n  { name: \"Krzysztof\", surname: \"Kamiński\", email: \"k.kaminski@example.com\", message: \"Mam pytanie odnośnie faktury numer FV/2026/04/123 - kwota wydaje się niezgodna z umową.\" },\n  { name: \"Magdalena\", surname: \"Szymańska\", email: \"m.szymanska@example.com\", message: \"PROSZĘ O PILNĄ POMOC! Dane klientów są widoczne publicznie po ostatniej aktualizacji, to katastrofa RODO!\" },\n  { name: \"Rafał\", surname: \"Mazur\", email: \"r.mazur@example.com\", message: \"Dzień dobry, chciałbym się dowiedzieć jakie są godziny waszej pracy i czy można umówić się na prezentację produktu.\" }\n];\n\nreturn tickets.map(t => ({ json: { ...t, ingested_at: new Date().toISOString() } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "c619e75c-4874-4bf2-ae24-43d12daec4f8",
+      "name": "Load Test Tickets"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        448,
+        0
+      ],
+      "id": "6350f3d6-2c59-4969-999c-4d414daf86b1",
+      "name": "Process One By One"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n  \"Content-Type\": \"application/json\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"Jesteś systemem klasyfikacji zgłoszeń przychodzących. Przeanalizuj poniższą wiadomość i zwróć WYŁĄCZNIE obiekt JSON (bez komentarzy, bez markdown, bez ```). Pola muszą przyjmować dokładnie jedną z podanych wartości.\\n\\nWiadomość od: {{ $json.name }} {{ $json.surname }} <{{ $json.email }}>\\nTreść: {{ $json.message }}\\n\\nZwróć JSON w formacie:\\n{\\n  \\\"category\\\": \\\"Recruitment\\\" | \\\"Support\\\" | \\\"Sales\\\" | \\\"Other\\\",\\n  \\\"sentiment\\\": \\\"Positive\\\" | \\\"Neutral\\\" | \\\"Negative\\\",\\n  \\\"priority\\\": \\\"High\\\" | \\\"Medium\\\" | \\\"Low\\\",\\n  \\\"reasoning\\\": \\\"jedno zdanie uzasadnienia po polsku\\\"\\n}\\n\\nZasady priorytetu:\\n- High: awarie produkcyjne, utrata danych, incydenty bezpieczeństwa/RODO, klient tracący pieniądze lub klientów\\n- Medium: problemy z dostępem, niezgodności faktur, pilne pytania sprzedażowe\\n- Low: ogólne zapytania, podziękowania, zapytania rekrutacyjne, pytania o godziny pracy\"\n        }\n      ]\n    }\n  ],\n  \"generationConfig\": {\n    \"temperature\": 0,\n    \"responseMimeType\": \"application/json\"\n  }\n}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2000
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        704,
+        256
+      ],
+      "id": "0a9b4cdd-5db3-4526-9261-f293b59a4002",
+      "name": "Gemini Classify",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "maxTries": 5,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "IjaB1BCWSGISwJ9p",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ALLOWED_CATEGORY  = [\"Recruitment\", \"Support\", \"Sales\", \"Other\"];\nconst ALLOWED_SENTIMENT = [\"Positive\", \"Neutral\", \"Negative\"];\nconst ALLOWED_PRIORITY  = [\"High\", \"Medium\", \"Low\"];\n\nfunction extractJson(raw) {\n  if (raw == null) return null;\n  if (typeof raw === \"object\") return raw;\n  let s = String(raw).trim();\n  s = s.replace(/^```(?:json)?\\s*/i, \"\").replace(/```\\s*$/i, \"\").trim();\n  try { return JSON.parse(s); } catch (_) {}\n  // Last resort: grab the first {...} block\n  const m = s.match(/\\{[\\s\\S]*\\}/);\n  if (m) {\n    try { return JSON.parse(m[0]); } catch (_) {}\n  }\n  return null;\n}\n\nfunction pickEnum(value, allowed, fallback) {\n  if (typeof value !== \"string\") return fallback;\n  const hit = allowed.find(a => a.toLowerCase() === value.trim().toLowerCase());\n  return hit || fallback;\n}\n\nconst ticket = $(\"Process One By One\").item.json;\n\n\nconst resp = $input.item.json;\nconst textPart = resp?.candidates?.[0]?.content?.parts?.[0]?.text;\nconst finishReason = resp?.candidates?.[0]?.finishReason;\nconst raw =\n  $json.DEBUG_text ||\n  $json.candidates?.[0]?.content?.parts?.[0]?.text ||\n  $json.text ||\n  $json.output ||\n  null;\n\nlet parsed = extractJson(textPart);\nlet aiError = null;\n\nif (!parsed) {\n  aiError = `Could not parse Gemini response (finishReason=${finishReason ?? \"unknown\"})`;\n  parsed = {};\n}\n\nconst analysis = {\n  category:  pickEnum(parsed.category,  ALLOWED_CATEGORY,  \"Other\"),\n  sentiment: pickEnum(parsed.sentiment, ALLOWED_SENTIMENT, \"Neutral\"),\n  priority:  pickEnum(parsed.priority,  ALLOWED_PRIORITY,  \"Low\"),\n  reasoning: typeof parsed.reasoning === \"string\" ? parsed.reasoning : \"\",\n};\n\nreturn [{\n  json: {\n    // Original ticket fields\n    name:    ticket.name,\n    surname: ticket.surname,\n    email:   ticket.email,\n    message: ticket.message,\n    ingested_at: ticket.ingested_at,\n    // AI analysis\n    ...analysis,\n    // Meta\n    model: \"gemini-2.5-flash\",\n    analyzed_at: new Date().toISOString(),\n  }\n}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        128
+      ],
+      "id": "b44acf44-63a4-4f88-a4ba-29a0a5837929",
+      "name": "Parse & Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert the current item to a single-line JSON + newline (JSONL format)\n// and expose it as binary data for the Read/Write Files node to append.\nconst line = JSON.stringify($json) + \"\\n\";\nconst binary = await this.helpers.prepareBinaryData(Buffer.from(line, \"utf8\"), \"ticket.jsonl\", \"application/x-ndjson\");\nreturn [{ json: $json, binary: { data: binary } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        128
+      ],
+      "id": "30640311-2401-4b39-b86f-c9672dcb487a",
+      "name": "To JSONL Line"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $env.TICKETS_OUTPUT_PATH || '/tmp/tickets.jsonl' }}",
+        "options": {
+          "append": true
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1328,
+        128
+      ],
+      "id": "a5f83cd0-d077-44dd-bec6-dbab347a5a7f",
+      "name": "Append to JSONL"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-priority-high",
+              "leftValue": "={{ $json.priority }}",
+              "rightValue": "High",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1552,
+        128
+      ],
+      "id": "63a1c205-bc4f-45d4-95b5-e89f0b91864e",
+      "name": "Priority == High?"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.ALERT_FROM_EMAIL || 'noreply@example.com' }}",
+        "toEmail": "={{ $env.ALERT_TO_EMAIL   || 'ops@example.com' }}",
+        "subject": "= [HIGH] {{ $json.category }} — {{ $json.name }} {{ $json.surname }}",
+        "html": "=<h2 style=\"color:#b00020;\"> Zgłoszenie o wysokim priorytecie</h2>\n<table style=\"font-family:Arial,sans-serif;font-size:14px;border-collapse:collapse;\">\n  <tr><td><b>Od:</b></td><td>{{ $json.name }} {{ $json.surname }} &lt;{{ $json.email }}&gt;</td></tr>\n  <tr><td><b>Kategoria:</b></td><td>{{ $json.category }}</td></tr>\n  <tr><td><b>Sentyment:</b></td><td>{{ $json.sentiment }}</td></tr>\n  <tr><td><b>Priorytet:</b></td><td style=\"color:#b00020;\"><b>{{ $json.priority }}</b></td></tr>\n  <tr><td><b>Uzasadnienie AI:</b></td><td>{{ $json.reasoning }}</td></tr>\n  <tr><td><b>Odebrano:</b></td><td>{{ $json.ingested_at }}</td></tr>\n</table>\n<hr/>\n<p><b>Treść wiadomości:</b></p>\n<blockquote style=\"border-left:4px solid #b00020;padding-left:12px;color:#333;\">{{ $json.message }}</blockquote>\n<hr/>\n<p style=\"font-size:11px;color:#888;\">Model: {{ $json.model }} · analyzed_at: {{ $json.analyzed_at }}</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1760,
+        0
+      ],
+      "id": "c4390121-c504-4a17-8a07-04b205017316",
+      "name": "Send Urgent Email",
+      "webhookId": "urgent-email-webhook",
+      "credentials": {
+        "smtp": {
+          "id": "MmeQpY8XXUxrfkk4",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        240
+      ],
+      "id": "0cd5b5b3-d0e6-4881-a89b-4ec2273ad490",
+      "name": "NoOp (Low/Medium)"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        656,
+        0
+      ],
+      "id": "8f8dd02b-3982-4e99-9dc8-c9cf449b4c3c",
+      "name": "Wait",
+      "webhookId": "d76270fd-e72d-49c0-847f-37c58478d713"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Load Test Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Test Tickets": {
+      "main": [
+        [
+          {
+            "node": "Process One By One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process One By One": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Classify": {
+      "main": [
+        [
+          {
+            "node": "Parse & Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Merge": {
+      "main": [
+        [
+          {
+            "node": "To JSONL Line",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "To JSONL Line": {
+      "main": [
+        [
+          {
+            "node": "Append to JSONL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to JSONL": {
+      "main": [
+        [
+          {
+            "node": "Priority == High?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Priority == High?": {
+      "main": [
+        [
+          {
+            "node": "Send Urgent Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp (Low/Medium)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Urgent Email": {
+      "main": [
+        [
+          {
+            "node": "Process One By One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NoOp (Low/Medium)": {
+      "main": [
+        [
+          {
+            "node": "Process One By One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Gemini Classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a8aa4032-52c2-4bc1-8efe-fe8b8d7de05a",
+  "meta": {
+    "instanceId": "b4b28e5146ba01290e9698dcc7646849898488e8f1c15551909358d22cdef604"
+  },
+  "id": "G9QiEr27XKhUtmLI",
+  "tags": []
+}
